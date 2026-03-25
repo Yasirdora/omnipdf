@@ -9,6 +9,9 @@
 import { PdfWriter, ascii, concatBytes, fx } from './writer.js';
 import { encodePdfString, encodePdfStringUtf16, encodeWinAnsi } from './encoding/winansi.js';
 import { getFontMetrics, STANDARD_FONTS, type StandardFontName } from './fonts/standard.js';
+import { EmbeddedFont } from './fonts/embedded.js';
+
+export type FontRef = StandardFontName | EmbeddedFont;
 
 export interface DocumentMetadata {
   title?: string;
@@ -31,7 +34,7 @@ export interface DocumentOptions extends DocumentMetadata {
 }
 
 export interface TextOptions {
-  font?: StandardFontName;
+  font?: FontRef;
   size?: number;
   color?: string;
   /** Horizontal alignment against `width` (requires width). Default left. */
@@ -71,7 +74,8 @@ const DEFAULT_PRODUCER = 'OmniPDF Core';
 
 export class Document {
   private pages: Page[] = [];
-  private fonts = new Map<StandardFontName, string>(); // font name -> resource key (F1…)
+  private fonts = new Map<StandardFontName, string>(); // base-14 name -> resource key (F1…)
+  private embeddedFonts = new Map<EmbeddedFont, string>(); // font -> resource key
   private images: ImageRef[] = [];
   private outlines: OutlineItem[] = [];
   private attachments: Array<{ name: string; data: Uint8Array; mime?: string; description?: string }> = [];
@@ -96,9 +100,27 @@ export class Document {
     let key = this.fonts.get(name);
     if (!key) {
       if (!STANDARD_FONTS.includes(name)) throw new Error(`Unknown base-14 font: ${name}`);
-      key = `F${this.fonts.size + 1}`;
+      key = `F${this.fonts.size + this.embeddedFonts.size + 1}`;
       this.fonts.set(name, key);
       getFontMetrics(name); // validates eagerly
+    }
+    return key;
+  }
+
+  /** Embed a TrueType font (glyf outlines). Returns a font usable in text(). */
+  embedFont(ttfBytes: Uint8Array): EmbeddedFont {
+    const font = new EmbeddedFont(ttfBytes);
+    const key = `F${this.fonts.size + this.embeddedFonts.size + 1}`;
+    this.embeddedFonts.set(font, key);
+    return font;
+  }
+
+  /** @internal — resource key for an embedded font (registered on first use). */
+  registerEmbedded(font: EmbeddedFont): string {
+    let key = this.embeddedFonts.get(font);
+    if (!key) {
+      key = `F${this.fonts.size + this.embeddedFonts.size + 1}`;
+      this.embeddedFonts.set(font, key);
     }
     return key;
   }
@@ -134,6 +156,20 @@ export class Document {
     const fontObjs = new Map<string, number>();
     for (const key of this.fonts.values()) fontObjs.set(key, w.allocate());
 
+    // embedded fonts: 5 objects each (Type0, CIDFont, Descriptor, FontFile2, ToUnicode)
+    const embeddedObjs = new Map<string, { type0: number; cid: number; descriptor: number; fontFile: number; toUnicode: number }>();
+    for (const [font, key] of this.embeddedFonts) {
+      const objs = {
+        type0: w.allocate(),
+        cid: w.allocate(),
+        descriptor: w.allocate(),
+        fontFile: w.allocate(),
+        toUnicode: w.allocate(),
+      };
+      embeddedObjs.set(key, objs);
+      fontObjs.set(key, objs.type0);
+    }
+
     for (const img of this.images) img.objNum = w.allocate();
 
     const contentObjs: number[] = [];
@@ -157,9 +193,9 @@ export class Document {
     const filespecObjs = this.attachments.map(() => w.allocate()); // Filespec dicts referencing them
 
     // --- shared resource dictionary ---
-    const fontRes = [...this.fonts.entries()]
-      .map(([name, key]) => `/${key} ${fontObjs.get(key)} 0 R`)
-      .join(' ');
+    // fontObjs covers base-14 AND embedded fonts (Type0 objNums); iterate both maps
+    const allFontKeys = [...this.fonts.values(), ...this.embeddedFonts.values()];
+    const fontRes = allFontKeys.map((key) => `/${key} ${fontObjs.get(key)} 0 R`).join(' ');
     const imgRes = this.images
       .map((img, i) => `/Im${i + 1} ${img.objNum} 0 R`)
       .join(' ');
@@ -186,6 +222,9 @@ export class Document {
     for (const [name, key] of this.fonts.entries()) {
       const encoding = getFontMetrics(name).isLatin ? ' /Encoding /WinAnsiEncoding' : '';
       w.setObject(fontObjs.get(key)!, `<< /Type /Font /Subtype /Type1 /BaseFont /${name}${encoding} >>`);
+    }
+    for (const [font, key] of this.embeddedFonts) {
+      font.emit(w, embeddedObjs.get(key)!);
     }
 
     // --- images (JPEG streams keep their native DCT encoding) ---
@@ -287,23 +326,31 @@ export class Page {
 
   /** Draw text. y is the baseline, measured from the top of the page. */
   text(str: string, x: number, y: number, opts?: TextOptions): this {
-    const fontName = opts?.font ?? 'Helvetica';
     const size = opts?.size ?? 12;
     const color = opts?.color ?? '#000000';
-    const key = this.doc.registerFont(fontName);
-    const metrics = getFontMetrics(fontName);
+    const fontRef = opts?.font;
+    const isEmbedded = fontRef instanceof EmbeddedFont;
+    const fontName: StandardFontName = !isEmbedded && fontRef ? fontRef : 'Helvetica';
+
+    const key = isEmbedded ? this.doc.registerEmbedded(fontRef) : this.doc.registerFont(fontName);
+
+    const widthAt = (s: string): number =>
+      isEmbedded
+        ? fontRef.widthAt(s, size) + (opts?.charSpacing ?? 0) * s.length
+        : getFontMetrics(fontName).widthAt(s, size, { kern: opts?.kern ?? true, charSpacing: opts?.charSpacing ?? 0 });
 
     let tx = x;
     const align = opts?.align ?? 'left';
     if (align !== 'left') {
       if (opts?.width === undefined) throw new Error('text align requires a width');
-      const tw = metrics.widthAt(str, size, { kern: opts?.kern ?? true, charSpacing: opts?.charSpacing ?? 0 });
+      const tw = widthAt(str);
       tx = align === 'right' ? x + opts.width - tw : x + (opts.width - tw) / 2;
     }
 
+    const body = isEmbedded ? fontRef.encodeHex(str) : encodePdfString(str);
     const cs = opts?.charSpacing ? `${fx(opts.charSpacing)} Tc ` : '';
     this.content.push(
-      `BT /${key} ${fx(size)} Tf ${pdfColor(color)} rg ${cs}${fx(tx)} ${fx(this.height - y)} Td ${encodePdfString(str)} Tj ET`,
+      `BT /${key} ${fx(size)} Tf ${pdfColor(color)} rg ${cs}${fx(tx)} ${fx(this.height - y)} Td ${body} Tj ET`,
     );
     return this;
   }

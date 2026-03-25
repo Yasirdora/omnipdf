@@ -25,3 +25,7 @@ export {
   LATIN_FONTS,
 } from './fonts/standard.js';
 export type { StandardFontName, FontMetrics } from './fonts/standard.js';
+export { EmbeddedFont } from './fonts/embedded.js';
+export { parseTtf, subsetTtf, glyphClosure } from './fonts/ttf.js';
+export type { TtfFont, SubsetResult } from './fonts/ttf.js';
+export type { FontRef } from './document.js';
