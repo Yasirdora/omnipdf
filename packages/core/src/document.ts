@@ -107,9 +107,15 @@ export class Document {
     return key;
   }
 
-  /** Embed a TrueType font (glyf outlines). Returns a font usable in text(). */
-  embedFont(ttfBytes: Uint8Array): EmbeddedFont {
-    const font = new EmbeddedFont(ttfBytes);
+  /**
+   * Embed a TrueType font (glyf outlines). Accepts raw bytes or a pre-parsed
+   * EmbeddedFont (e.g. one already used for measuring). Returns a font usable
+   * in text().
+   */
+  embedFont(input: Uint8Array | EmbeddedFont): EmbeddedFont {
+    const font = input instanceof EmbeddedFont ? input : new EmbeddedFont(input);
+    const existing = this.embeddedFonts.get(font);
+    if (existing) return font;
     const key = `F${this.fonts.size + this.embeddedFonts.size + 1}`;
     this.embeddedFonts.set(font, key);
     return font;
@@ -358,6 +364,14 @@ export class Page {
   /** Filled rectangle (top-left coords). */
   rect(x: number, y: number, w: number, h: number, fill: string): this {
     this.content.push(`${pdfColor(fill)} rg ${fx(x)} ${fx(this.height - y - h)} ${fx(w)} ${fx(h)} re f`);
+    return this;
+  }
+
+  /** Stroked rectangle outline (top-left coords). */
+  strokeRect(x: number, y: number, w: number, h: number, stroke: string, width = 1): this {
+    this.content.push(
+      `${pdfColor(stroke)} RG ${fx(width)} w ${fx(x)} ${fx(this.height - y - h)} ${fx(w)} ${fx(h)} re S`,
+    );
     return this;
   }
 

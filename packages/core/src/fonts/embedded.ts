@@ -43,6 +43,21 @@ export class EmbeddedFont {
     return this.font.unitsPerEm;
   }
 
+  /** Ascender in 1000-em units (AFM convention), for baseline math. */
+  get ascender(): number {
+    return Math.round((this.font.ascender * 1000) / this.font.unitsPerEm);
+  }
+
+  /** Descender in 1000-em units (negative). */
+  get descender(): number {
+    return Math.round((this.font.descender * 1000) / this.font.unitsPerEm);
+  }
+
+  /** Cap height in 1000-em units. */
+  get capHeight(): number {
+    return Math.round((this.font.capHeight * 1000) / this.font.unitsPerEm);
+  }
+
   /** Width of a string at `size` pt, using hmtx advances (no kerning in v1). */
   widthAt(text: string, size: number): number {
     let total = 0;
