@@ -21,6 +21,11 @@ export type FurnitureFn = (page: CorePage, ctx: FurnitureContext) => void;
 
 export interface RenderOptions {
   metadata?: DocumentOptions;
+  attachments?: Array<{
+    name: string;
+    data: Uint8Array;
+    opts?: { mime?: string; description?: string; afRelationship?: 'Data' | 'Source' | 'Alternative' | 'Supplement' | 'Unspecified' };
+  }>;
   header?: FurnitureFn;
   footer?: FurnitureFn;
 }
@@ -37,6 +42,7 @@ export function renderPages(
   for (const [, f] of fonts.entries()) {
     if (f.embedded && f.ref instanceof EmbeddedFont) doc.embedFont(f.ref);
   }
+  for (const a of opts.attachments ?? []) doc.attach(a.name, a.data, a.opts);
 
   const total = pages.length;
   for (const layout of pages) {

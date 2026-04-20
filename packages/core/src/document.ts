@@ -8,6 +8,7 @@
  */
 import { PdfWriter, ascii, concatBytes, fx } from './writer.js';
 import { encodePdfString, encodePdfStringUtf16, encodeWinAnsi } from './encoding/winansi.js';
+import { buildSrgbIccProfile } from './pdfa/icc.js';
 import { getFontMetrics, STANDARD_FONTS, type StandardFontName } from './fonts/standard.js';
 import { EmbeddedFont } from './fonts/embedded.js';
 
@@ -31,6 +32,17 @@ export interface DocumentMetadata {
 export interface DocumentOptions extends DocumentMetadata {
   /** Compress content streams (default true, deterministic deflate). */
   compress?: boolean;
+  /**
+   * PDF/A-3 mode: '3B' (basic) or '3U' (B + Unicode mapping). Adds an sRGB
+   * OutputIntent, pdfaid XMP, and requires ALL fonts embedded — base-14
+   * usage throws at build time (register a TTF instead).
+   */
+  pdfa?: '3B' | '3U';
+  /**
+   * Raw XML fragments appended to the XMP rdf:Description (extension
+   * schemas — e.g. the Factur-X fx: block). Must be well-formed.
+   */
+  xmpExtensions?: string[];
 }
 
 export interface TextOptions {
@@ -78,14 +90,18 @@ export class Document {
   private embeddedFonts = new Map<EmbeddedFont, string>(); // font -> resource key
   private images: ImageRef[] = [];
   private outlines: OutlineItem[] = [];
-  private attachments: Array<{ name: string; data: Uint8Array; mime?: string; description?: string }> = [];
+  private attachments: Array<{ name: string; data: Uint8Array; mime?: string; description?: string; afRelationship?: string }> = [];
   private meta: DocumentMetadata;
   private compress: boolean;
+  private pdfa?: '3B' | '3U';
+  private xmpExtensions: string[];
 
   constructor(opts?: DocumentOptions) {
-    const { compress, ...meta } = opts ?? {};
+    const { compress, pdfa, xmpExtensions, ...meta } = opts ?? {};
     this.meta = meta;
     this.compress = compress ?? true;
+    this.pdfa = pdfa;
+    this.xmpExtensions = xmpExtensions ?? [];
   }
 
   /** Add a page. Defaults to A4 (595.28 × 841.89 pt). */
@@ -140,8 +156,8 @@ export class Document {
   }
 
   /** Attach an arbitrary file (round-trip payloads, source data, CSVs…). */
-  attach(name: string, data: Uint8Array, opts?: { mime?: string; description?: string }): void {
-    this.attachments.push({ name, data: new Uint8Array(data), mime: opts?.mime, description: opts?.description });
+  attach(name: string, data: Uint8Array, opts?: { mime?: string; description?: string; afRelationship?: 'Data' | 'Source' | 'Alternative' | 'Supplement' | 'Unspecified' }): void {
+    this.attachments.push({ name, data: new Uint8Array(data), mime: opts?.mime, description: opts?.description, afRelationship: opts?.afRelationship });
   }
 
   /** Set the document outline (bookmarks sidebar). */
@@ -151,6 +167,13 @@ export class Document {
 
   /** Serialize to a deterministic Uint8Array. Safe to call multiple times. */
   build(): Uint8Array {
+    if (this.pdfa && this.fonts.size > 0) {
+      throw new Error(
+        `PDF/A-${this.pdfa} requires every font to be embedded, but base-14 fonts ` +
+          `(${[...this.fonts.keys()].join(', ')}) are not embeddable. Register a TTF ` +
+          'with doc.embedFont() and use it instead.',
+      );
+    }
     const w = new PdfWriter();
 
     // --- allocate core objects in a fixed order ---
@@ -158,6 +181,10 @@ export class Document {
     const pagesObj = w.allocate();
     const infoObj = w.allocate();
     const xmpObj = w.allocate();
+
+    // PDF/A: OutputIntent (dict + embedded sRGB ICC profile)
+    const outputIntentObj = this.pdfa ? w.allocate() : 0;
+    const iccObj = this.pdfa ? w.allocate() : 0;
 
     const fontObjs = new Map<string, number>();
     for (const key of this.fonts.values()) fontObjs.set(key, w.allocate());
@@ -211,18 +238,30 @@ export class Document {
     // --- catalog / pages tree ---
     const namesPart = namesObj ? ` /Names ${namesObj} 0 R /AF [${filespecObjs.map((n) => `${n} 0 R`).join(' ')}]` : '';
     const outlinePart = outlineRoot ? ` /Outlines ${outlineRoot} 0 R /PageMode /UseOutlines` : '';
+    const outputIntentsPart = this.pdfa ? ` /OutputIntents [${outputIntentObj} 0 R]` : '';
     w.setObject(
       catalogObj,
-      `<< /Type /Catalog /Pages ${pagesObj} 0 R /Metadata ${xmpObj} 0 R${outlinePart}${namesPart} >>`,
+      `<< /Type /Catalog /Pages ${pagesObj} 0 R /Metadata ${xmpObj} 0 R${outlinePart}${namesPart}${outputIntentsPart} >>`,
     );
     w.setObject(
       pagesObj,
       `<< /Type /Pages /Kids [${pageObjs.map((n) => `${n} 0 R`).join(' ')}] /Count ${pageObjs.length} >>`,
     );
 
+    // --- PDF/A OutputIntent with embedded sRGB ICC profile ---
+    if (this.pdfa) {
+      const icc = buildSrgbIccProfile();
+      w.setStreamObject(iccObj, ` /N 3 /Alternate /DeviceRGB`, icc, { compress: this.compress });
+      w.setObject(
+        outputIntentObj,
+        `<< /Type /OutputIntent /S /GTS_PDFA1 /OutputConditionIdentifier (sRGB) ` +
+          `/Info (sRGB IEC 61966-2-1) /DestOutputProfile ${iccObj} 0 R >>`,
+      );
+    }
+
     // --- info + XMP ---
     w.setObject(infoObj, buildInfoDict(this.meta));
-    w.setStreamObject(xmpObj, ' /Type /Metadata /Subtype /XML', ascii(buildXmp(this.meta)), { compress: false });
+    w.setStreamObject(xmpObj, ' /Type /Metadata /Subtype /XML', new TextEncoder().encode(buildXmp(this.meta, this.pdfa, this.xmpExtensions)), { compress: false });
 
     // --- fonts ---
     for (const [name, key] of this.fonts.entries()) {
@@ -260,7 +299,7 @@ export class Document {
         const y2 = page.height - link.y;
         w.setObject(
           annots[j]!,
-          `<< /Type /Annot /Subtype /Link /Rect [${fx(x1)} ${fx(y1)} ${fx(x2)} ${fx(y2)}] /Border [0 0 0] /A << /S /URI /URI ${encodePdfString(link.url)} >> >>`,
+          `<< /Type /Annot /Subtype /Link /Rect [${fx(x1)} ${fx(y1)} ${fx(x2)} ${fx(y2)}] /F 4 /Border [0 0 0] /A << /S /URI /URI ${encodePdfString(link.url)} >> >>`,
         );
       });
     });
@@ -301,9 +340,10 @@ export class Document {
         const mime = a.mime ? ` /Subtype /${a.mime.replace('/', '#2F')}` : '';
         const params = ` /Params << /Size ${a.data.length} >>`;
         const desc = a.description ? ` /Desc ${encodePdfString(a.description)}` : '';
+        const afRel = a.afRelationship ? ` /AFRelationship /${a.afRelationship}` : '';
         w.setObject(
           filespecObjs[i]!,
-          `<< /Type /Filespec /F ${encodePdfString(a.name)} /UF ${encodePdfStringUtf16(a.name)}${desc} /EF << /F ${attachmentObjs[i]} 0 R /UF ${attachmentObjs[i]} 0 R >> >>`,
+          `<< /Type /Filespec /F ${encodePdfString(a.name)} /UF ${encodePdfStringUtf16(a.name)}${desc}${afRel} /EF << /F ${attachmentObjs[i]} 0 R /UF ${attachmentObjs[i]} 0 R >> >>`,
         );
         w.setStreamObject(attachmentObjs[i]!, ` /Type /EmbeddedFile${mime}${params}`, a.data, { compress: this.compress });
       });
@@ -459,18 +499,24 @@ function xmpEscape(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function buildXmp(meta: DocumentMetadata): string {
+function buildXmp(meta: DocumentMetadata, pdfa?: '3B' | '3U', extensions: string[] = []): string {
   const rows: string[] = [];
   if (meta.title) rows.push(`<dc:title><rdf:Alt><rdf:li xml:lang="x-default">${xmpEscape(meta.title)}</rdf:li></rdf:Alt></dc:title>`);
   if (meta.author) rows.push(`<dc:creator><rdf:Seq><rdf:li>${xmpEscape(meta.author)}</rdf:li></rdf:Seq></dc:creator>`);
   if (meta.subject) rows.push(`<dc:description><rdf:Alt><rdf:li xml:lang="x-default">${xmpEscape(meta.subject)}</rdf:li></rdf:Alt></dc:description>`);
   if (meta.creator) rows.push(`<xmp:CreatorTool>${xmpEscape(meta.creator)}</xmp:CreatorTool>`);
   rows.push(`<pdf:Producer>${xmpEscape(meta.producer ?? DEFAULT_PRODUCER)}</pdf:Producer>`);
+  if (pdfa) {
+    rows.push(`<pdfaid:part>3</pdfaid:part>`);
+    rows.push(`<pdfaid:conformance>${pdfa === '3U' ? 'U' : 'B'}</pdfaid:conformance>`);
+  }
+  rows.push(...extensions);
+  const pdfaidNs = pdfa ? ' xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"' : '';
   return [
     '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>',
     '<x:xmpmeta xmlns:x="adobe:ns:meta/">',
     '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">',
-    `<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:pdf="http://ns.adobe.com/pdf/1.3/">`,
+    `<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:pdf="http://ns.adobe.com/pdf/1.3/"${pdfaidNs}>`,
     rows.join('\n'),
     '</rdf:Description>',
     '</rdf:RDF>',

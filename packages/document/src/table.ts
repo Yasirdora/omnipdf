@@ -153,6 +153,8 @@ export interface TableBlockOpts extends BlockProps {
   rows: StyledRun[][][];
   /** Number of leading rows that are headers (repeated per page). */
   header?: number;
+  /** Per-column horizontal alignment (default left). */
+  columnAlign?: Array<'left' | 'right' | 'center'>;
   style: ResolvedTableStyle;
 }
 
@@ -180,7 +182,7 @@ export class TableBlock implements Block {
         const cellStyleRuns = cell.runs;
         const lines = breakLines(cellStyleRuns, ctx.measurer, {
           widthAt: () => Math.max(12, colWidths[c]! - 2 * style.padding),
-          align: 'left',
+          align: this.def.columnAlign?.[c] ?? 'left',
           lineHeight: style.lineHeight,
           fallback: { font: style.font, size: style.size },
         });
