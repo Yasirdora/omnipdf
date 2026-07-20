@@ -1,7 +1,7 @@
 {
   "name": "@omnipdf/document",
   "version": "0.1.0",
-  "description": "Block model, measurer, and convergence paginator for OmniPDF — paragraphs, tables, footnotes, keep rules, page furniture, two-pass totals. Turns structured content into laid-out pages on @omnipdf/core.",
+  "description": "Block model, measurer, and convergence paginator for OmniPDF \u2014 paragraphs, tables, footnotes, keep rules, page furniture, two-pass totals. Turns structured content into laid-out pages on @omnipdf/core.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -21,7 +21,8 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "pdf",
@@ -44,5 +45,17 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yasirdora/omnipdf.git",
+    "directory": "packages/document"
+  },
+  "homepage": "https://github.com/Yasirdora/omnipdf/tree/main/packages/document",
+  "bugs": {
+    "url": "https://github.com/Yasirdora/omnipdf/issues"
   }
 }

@@ -18,11 +18,24 @@
     "src"
   ],
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yasirdora/omnipdf.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/Yasirdora/omnipdf/tree/main/packages/core",
+  "bugs": {
+    "url": "https://github.com/Yasirdora/omnipdf/issues"
+  },
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "example": "tsx examples/invoice.ts"
+    "example": "tsx examples/invoice.ts",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "pdf",
