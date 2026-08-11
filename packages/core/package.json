@@ -1,0 +1,48 @@
+{
+  "name": "@omnipdf/core",
+  "version": "0.1.0",
+  "description": "Zero-dependency PDF writer: objects, streams, deterministic deflate, base-14 fonts, images, links, outlines, attachments, XMP metadata. The foundation of the OmniPDF document engine.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "example": "tsx examples/invoice.ts"
+  },
+  "keywords": [
+    "pdf",
+    "pdf-generator",
+    "pdf-engine",
+    "zero-dependencies",
+    "deterministic",
+    "documents",
+    "invoice",
+    "report"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.5"
+  }
+}
