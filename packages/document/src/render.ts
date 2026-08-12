@@ -5,7 +5,7 @@
  * produces the same bytes (core build is deterministic: own deflate, no
  * timestamps, no random ids).
  */
-import { Document as CoreDocument, Page as CorePage, EmbeddedFont, type DocumentOptions } from '@omnipdf/core';
+import { Document as CoreDocument, Page as CorePage, EmbeddedFont, type DocumentOptions, type FontRef } from '@omnipdf/core';
 import type { FontRegistry } from './measurer.js';
 import type { PageGeometry } from './paginator.js';
 import type { LayoutLine, PageLayout, Placement, Slice } from './types.js';
@@ -15,6 +15,8 @@ export interface FurnitureContext {
   page: number;
   /** Total page count (known at render time — furniture can't change layout). */
   pages: number;
+  /** Resolve a LayoutDocument font name to a core font ref for furniture text. */
+  font: (name: string) => FontRef;
 }
 
 export type FurnitureFn = (page: CorePage, ctx: FurnitureContext) => void;
@@ -47,7 +49,7 @@ export function renderPages(
   const total = pages.length;
   for (const layout of pages) {
     const page = doc.addPage(geom.pageWidth, geom.pageHeight);
-    const ctx: FurnitureContext = { page: layout.index, pages: total };
+    const ctx: FurnitureContext = { page: layout.index, pages: total, font: (name) => fonts.resolve(name).ref };
     opts.header?.(page, ctx);
     for (const p of layout.placements) drawPlacement(page, p, fonts, geom);
     for (const p of layout.notes) drawPlacement(page, p, fonts, geom);
