@@ -13,6 +13,9 @@ export type {
 } from './document.js';
 export { PdfWriter, ascii, concatBytes, fx } from './writer.js';
 export { deflate } from './deflate.js';
+export { inflate, inflateZlib, adler32 } from './inflate.js';
+export { extractEmbeddedFiles, extractAttachment } from './reader.js';
+export type { ExtractedFile } from './reader.js';
 export {
   encodeWinAnsi,
   encodePdfString,
@@ -29,3 +32,4 @@ export { EmbeddedFont } from './fonts/embedded.js';
 export { parseTtf, subsetTtf, glyphClosure } from './fonts/ttf.js';
 export type { TtfFont, SubsetResult } from './fonts/ttf.js';
 export type { FontRef } from './document.js';
+export { buildSrgbIccProfile } from './pdfa/icc.js';

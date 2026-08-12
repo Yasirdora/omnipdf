@@ -37,6 +37,8 @@ export interface LayoutDocumentOptions {
   /** Drawn on every page, inside the margins — page numbers, running heads. */
   header?: FurnitureFn;
   footer?: FurnitureFn;
+  /** PDF/A-3 archival mode ('3B' | '3U'). Requires all-embedded fonts. */
+  pdfa?: '3B' | '3U';
   title?: string;
   author?: string;
   subject?: string;
@@ -48,6 +50,8 @@ export interface TableDef extends BlockProps {
   rows: Array<Array<string | TextRun[]>>;
   /** Leading rows repeated on every page the table continues onto. */
   header?: number;
+  /** Per-column horizontal alignment (numbers right, text left — e.g. ['left','right','right']). */
+  columnAlign?: Array<'left' | 'right' | 'center'>;
   style?: {
     font?: string;
     size?: number;
@@ -71,6 +75,8 @@ export class LayoutDocument {
   private readonly measurer = new Measurer(this.registry);
   private readonly blocks: Block[] = [];
   private readonly notes = new Map<number, string>();
+  private readonly attachments: Array<{ name: string; data: Uint8Array; opts?: { mime?: string; description?: string; afRelationship?: 'Data' | 'Source' | 'Alternative' | 'Supplement' | 'Unspecified' } }> = [];
+  private readonly xmpExtensions: string[] = [];
   private noteCounter = 0;
   private readonly defaultStyle: ResolvedParagraphStyle;
   private readonly noteStyle: { font: string; size: number; lineHeight: number; color: string };
@@ -117,6 +123,25 @@ export class LayoutDocument {
   /** Register a font: base-14 name, TTF bytes, or a pre-parsed EmbeddedFont. */
   font(name: string, source: FontSource): this {
     this.registry.register(name, source);
+    return this;
+  }
+
+  /**
+   * Attach a file to the PDF (living-payload document.json, Factur-X XML,
+   * source CSVs). Rendered into every build() deterministically.
+   */
+  attach(
+    name: string,
+    data: Uint8Array,
+    opts?: { mime?: string; description?: string; afRelationship?: 'Data' | 'Source' | 'Alternative' | 'Supplement' | 'Unspecified' },
+  ): this {
+    this.attachments.push({ name, data, opts });
+    return this;
+  }
+
+  /** Append a raw XMP extension fragment (e.g. the Factur-X fx: schema block). */
+  xmpExtension(xml: string): this {
+    this.xmpExtensions.push(xml);
     return this;
   }
 
@@ -195,6 +220,7 @@ export class LayoutDocument {
         columns: def.columns,
         rows,
         ...(headerCount ? { header: headerCount } : {}),
+        ...(def.columnAlign ? { columnAlign: def.columnAlign } : {}),
         style,
         ...pickBlockProps(def),
       }),
@@ -218,7 +244,10 @@ export class LayoutDocument {
         ...(this.opts.author !== undefined ? { author: this.opts.author } : {}),
         ...(this.opts.subject !== undefined ? { subject: this.opts.subject } : {}),
         ...(this.opts.keywords !== undefined ? { keywords: this.opts.keywords } : {}),
+        ...(this.opts.pdfa !== undefined ? { pdfa: this.opts.pdfa } : {}),
+        ...(this.xmpExtensions.length ? { xmpExtensions: [...this.xmpExtensions] } : {}),
       },
+      attachments: this.attachments.map((a) => ({ name: a.name, data: a.data, ...(a.opts ? { opts: a.opts } : {}) })),
       ...(this.opts.header ? { header: this.opts.header } : {}),
       ...(this.opts.footer ? { footer: this.opts.footer } : {}),
     });

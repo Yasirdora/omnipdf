@@ -1,0 +1,49 @@
+{
+  "name": "@omnipdf/einvoice",
+  "version": "0.1.0",
+  "description": "Electronic invoicing for OmniPDF: EN 16931 semantic model, Factur-X 1.0 / ZUGFeRD 2.x CrossIndustryInvoice XML, and PDF/A-3 assembly glue.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "e-invoice",
+    "factur-x",
+    "zugferd",
+    "en16931",
+    "pdfa-3",
+    "cii"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@omnipdf/core": "0.1.0",
+    "@omnipdf/document": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.5"
+  }
+}
