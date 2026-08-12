@@ -5,7 +5,8 @@
   "description": "OmniPDF monorepo — the universal structured-document PDF engine.",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
