@@ -31,4 +31,4 @@ fx.doc.build();  // US Letter screenplay + embedded Fountain source
 
 Every template embeds `document.json` (`/Source` relationship, PDF/A-3 safe). Restore with `extractAttachment` from `@omnipdf/core` — the file you sent is the file you edit.
 
-All themes accept `accent`, custom fonts (base-14 or TTF), and `pdfa: '3B' | '3U'`. Part of [OmniPDF](https://github.com/Yasirdora/omnipdf). MIT © 2026 Yasirdora.
+All themes accept `accent`, custom fonts (base-14 or TTF), and `pdfa: '3B' | '3U'`. Part of [OmniPDF](https://github.com/OmniPDF/omnipdf). MIT © 2026 Yasirdora.

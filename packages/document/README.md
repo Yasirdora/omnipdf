@@ -36,4 +36,4 @@ const bytes = doc.build();
 - Header/footer furniture with resolved fonts and total page count.
 - Embedded TTF fonts via `@omnipdf/core`; PDF/A-3 passthrough.
 
-Part of [OmniPDF](https://github.com/Yasirdora/omnipdf). MIT © 2026 Yasirdora.
+Part of [OmniPDF](https://github.com/OmniPDF/omnipdf). MIT © 2026 Yasirdora.

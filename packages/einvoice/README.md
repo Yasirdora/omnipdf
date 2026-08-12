@@ -28,4 +28,4 @@ const bytes = doc.build();                 // PDF/A-3B + CII XML inside
 - **Factur-X / ZUGFeRD CII XML** (D16B, EN16931 profile, XSD sequence order), attached as `factur-x.xml` with `/Alternative` + the `fx:` XMP extension schema.
 - Composes with any `@omnipdf/document` layout — bring your own design or use `@omnipdf/templates`.
 
-Note: output is structurally conformant (XMP, OutputIntent, well-formed CII); run it through official validators (veraPDF, Mustang) before filing. MIT © 2026 Yasirdora — part of [OmniPDF](https://github.com/Yasirdora/omnipdf).
+Note: output is structurally conformant (XMP, OutputIntent, well-formed CII); run it through official validators (veraPDF, Mustang) before filing. MIT © 2026 Yasirdora — part of [OmniPDF](https://github.com/OmniPDF/omnipdf).

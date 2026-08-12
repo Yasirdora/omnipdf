@@ -60,4 +60,4 @@ First public release.
   (veraPDF, Mustang) pending — treat as pre-certification.
 - Single-column layout; TrueType (glyf) fonts only; Latin scripts only.
 
-[0.1.0]: https://github.com/Yasirdora/omnipdf/releases/tag/v0.1.0
+[0.1.0]: https://github.com/OmniPDF/omnipdf/releases/tag/v0.1.0

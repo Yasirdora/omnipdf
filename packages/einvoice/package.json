@@ -52,11 +52,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Yasirdora/omnipdf.git",
+    "url": "git+https://github.com/OmniPDF/omnipdf.git",
     "directory": "packages/einvoice"
   },
-  "homepage": "https://github.com/Yasirdora/omnipdf/tree/main/packages/einvoice",
+  "homepage": "https://github.com/OmniPDF/omnipdf/tree/main/packages/einvoice",
   "bugs": {
-    "url": "https://github.com/Yasirdora/omnipdf/issues"
+    "url": "https://github.com/OmniPDF/omnipdf/issues"
   }
 }

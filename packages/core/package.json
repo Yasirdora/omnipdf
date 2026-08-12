@@ -23,12 +23,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Yasirdora/omnipdf.git",
+    "url": "git+https://github.com/OmniPDF/omnipdf.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/Yasirdora/omnipdf/tree/main/packages/core",
+  "homepage": "https://github.com/OmniPDF/omnipdf/tree/main/packages/core",
   "bugs": {
-    "url": "https://github.com/Yasirdora/omnipdf/issues"
+    "url": "https://github.com/OmniPDF/omnipdf/issues"
   },
   "scripts": {
     "build": "tsup",

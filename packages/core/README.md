@@ -24,4 +24,4 @@ const bytes: Uint8Array = pdf.build(); // same input → same bytes, every time
 - **Reader**: `extractEmbeddedFiles` / `extractAttachment` for the living-payload round-trip.
 - **Zero dependencies**, ESM + CJS + types, Node 18+ and browsers.
 
-Part of [OmniPDF](https://github.com/Yasirdora/omnipdf). MIT © 2026 Yasirdora.
+Part of [OmniPDF](https://github.com/OmniPDF/omnipdf). MIT © 2026 Yasirdora.
